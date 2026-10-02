@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ICT 서비스 요청 & 전자 결재 시스템 (ClickHouse)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap");
+      body {
+        font-family: "Noto Sans KR", sans-serif;
+        background-color: #f8fafc;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 23, 42, 0.6);
+        z-index: 50;
+      }
+    </style>
+  </head>
+  <body class="text-slate-800 antialiased min-h-screen">
+    <div class="min-h-screen flex">
+      <!-- Sidebar -->
+      <aside
+        class="w-64 bg-slate-900 text-white p-6 hidden lg:flex flex-col justify-between shadow-xl"
+      >
+        <div>
+          <div class="flex items-center gap-3 mb-10">
+            <div
+              class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center font-bold text-lg text-white shadow-md"
+            >
+              IT
+            </div>
+            <div>
+              <h1 class="text-lg font-bold text-white tracking-tight">
+                ICT Portal
+              </h1>
+              <p class="text-xs text-blue-400 font-medium">
+                ClickHouse Enterprise
+              </p>
+            </div>
+          </div>
+          <nav class="space-y-2">
+            <a
+              href="#"
+              class="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600 font-medium text-sm transition"
+            >
+              <svg
+                class="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                ></path>
+              </svg>
+              대시보드
+            </a>
+            <a
+              href="#"
+              class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 font-medium text-sm transition"
+            >
+              <svg
+                class="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                ></path>
+              </svg>
+              나의 결재함
+            </a>
+            <a
+              href="#"
+              class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 text-slate-300 font-medium text-sm transition"
+            >
+              <svg
+                class="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                ></path>
+              </svg>
+              오토에버 협의창구
+            </a>
+          </nav>
+        </div>
+        <div
+          class="bg-slate-800/80 p-4 rounded-xl border border-slate-700/60 text-xs"
+        >
+          <span class="text-slate-400">데이터 저장소:</span>
+          <p class="font-bold text-slate-200 mt-0.5">ClickHouse (Port: 8123)</p>
+        </div>
+      </aside>
+
+      <main class="flex-1 p-6 md:p-10 overflow-y-auto">
+        <!-- Header Section -->
+        <div
+          class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+        >
+          <div>
+            <h2 class="text-2xl font-bold text-slate-900 tracking-tight">
+              서비스 개선 및 접수 현황
+            </h2>
+            <div class="flex items-center gap-2 mt-1.5">
+              <span
+                id="connection-status"
+                class="w-2.5 h-2.5 rounded-full bg-red-500"
+              ></span>
+              <p
+                id="connection-text"
+                class="text-slate-500 text-xs font-medium"
+              >
+                ClickHouse 서버 연결 확인 중...
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <button
+              onclick="fetchRequests()"
+              class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 transition shadow-sm"
+            >
+              🔄 새로고침
+            </button>
+            <button
+              onclick="openModal('requestModal')"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm transition shadow-lg shadow-blue-200 flex items-center gap-2"
+            >
+              <span>+</span> 신규 요청 상신
+            </button>
+          </div>
+        </div>
+
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+          <div
+            class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200"
+          >
+            <p class="text-xs font-medium text-slate-500">전체 요청</p>
+            <p id="stat-total" class="text-2xl font-bold text-slate-900 mt-1">
+              0건
+            </p>
+          </div>
+          <div
+            class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200"
+          >
+            <p class="text-xs font-medium text-slate-500">접수 / 검토 중</p>
+            <p id="stat-review" class="text-2xl font-bold text-amber-600 mt-1">
+              0건
+            </p>
+          </div>
+          <div
+            class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200"
+          >
+            <p class="text-xs font-medium text-slate-500">협의 / ITSM 진행</p>
+            <p id="stat-progress" class="text-2xl font-bold text-blue-600 mt-1">
+              0건
+            </p>
+          </div>
+          <div
+            class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200"
+          >
+            <p class="text-xs font-medium text-slate-500">완료건</p>
+            <p id="stat-done" class="text-2xl font-bold text-emerald-600 mt-1">
+              0건
+            </p>
+          </div>
+        </div>
+
+        <div
+          class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"
+        >
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead
+                class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-600 uppercase"
+              >
+                <tr>
+                  <th class="p-4">요청 ID</th>
+                  <th class="p-4">구분 / 제목</th>
+                  <th class="p-4">요청자</th>
+                  <th class="p-4">진행 상태</th>
+                  <th class="p-4">완료 요청일</th>
+                  <th class="p-4">상신 일시</th>
+                  <th class="p-4 text-center">작업</th>
+                </tr>
+              </thead>
+              <tbody id="request-list" class="divide-y divide-slate-100">
+                <tr>
+                  <td colspan="7" class="p-12 text-center text-slate-400">
+                    데이터를 불러오는 중입니다...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <div id="requestModal" class="modal items-center justify-center p-4">
+      <div
+        class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+      >
+        <form
+          id="submitForm"
+          onsubmit="submitRequest(event)"
+          class="flex flex-col h-full"
+        >
+          <div
+            class="p-6 border-b flex justify-between items-center bg-slate-50"
+          >
+            <div>
+              <h3 class="text-lg font-bold text-slate-900">
+                신규 서비스 개선 요청 상신
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5">
+                ClickHouse DB에 실시간 저장됩니다.
+              </p>
+            </div>
+            <button
+              type="button"
+              onclick="closeModal('requestModal')"
+              class="text-slate-400 hover:text-slate-600 text-lg"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="p-6 space-y-4 overflow-y-auto flex-1">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1.5"
+                  >시스템 구분 <span class="text-red-500">*</span></label
+                >
+                <select
+                  id="systemType"
+                  class="w-full border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">시스템을 선택하세요</option>
+                  <option value="Client">Client</option>
+                  <option value="Web">Web</option>
+                  <option value="WCT">WCT</option>
+                  <option value="Loader">Loader</option>
+                  <option value="Etc">Etc (기타)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1.5"
+                  >개선 완료 요청일</label
+                >
+                <input
+                  type="date"
+                  id="targetDate"
+                  class="w-full border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5"
+                >요청 제목 <span class="text-red-500">*</span></label
+              >
+              <input
+                type="text"
+                id="title"
+                placeholder="요청 사항을 한눈에 알기 쉽게 입력하세요"
+                class="w-full border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5"
+                >현상 (As-Is) <span class="text-red-500">*</span></label
+              >
+              <textarea
+                id="currentStatus"
+                rows="3"
+                placeholder="현재 겪고 계신 문제점, 오류 상황, 운영상 병목을 기술해주세요"
+                class="w-full border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              ></textarea>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5"
+                >개선 요청 사항 (To-Be)
+                <span class="text-red-500">*</span></label
+              >
+              <textarea
+                id="improvementRequest"
+                rows="3"
+                placeholder="개선되기를 바라는 내용과 요구사항을 기술해주세요"
+                class="w-full border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              ></textarea>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5"
+                >비고 및 참고 사항</label
+              >
+              <textarea
+                id="content"
+                rows="2"
+                placeholder="기타 참고 데이터 또는 부가 설명"
+                class="w-full border border-slate-300 rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              ></textarea>
+            </div>
+
+            <input type="hidden" id="requester" value="사용자 (사내망)" />
+          </div>
+
+          <div class="p-5 bg-slate-50 flex justify-end gap-3 border-t">
+            <button
+              type="button"
+              onclick="closeModal('requestModal')"
+              class="px-5 py-2.5 text-slate-600 font-medium text-sm hover:bg-slate-200 rounded-xl transition"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              class="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-medium text-sm hover:bg-blue-700 transition shadow-md shadow-blue-200"
+            >
+              상신하기
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="detailModal" class="modal items-center justify-center p-4">
+      <div
+        class="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
+      >
+        <div class="p-6 border-b flex justify-between items-center bg-slate-50">
+          <div>
+            <div class="flex items-center gap-2">
+              <span
+                id="detail-system-badge"
+                class="px-2 py-0.5 text-xs font-bold bg-blue-100 text-blue-700 rounded uppercase"
+                >SYSTEM</span
+              >
+              <span
+                id="detail-reqid"
+                class="text-xs font-semibold text-slate-500 font-mono"
+                >REQ-0000</span
+              >
+            </div>
+            <h3 id="detail-title" class="text-xl font-bold text-slate-900 mt-1">
+              상세 제목
+            </h3>
+          </div>
+          <button
+            onclick="closeModal('detailModal')"
+            class="text-slate-400 hover:text-slate-600 text-xl"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div
+          class="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6"
+        >
+          <!-- Left: Process Tracking Timeline -->
+          <div
+            class="md:col-span-1 bg-slate-50 p-5 rounded-2xl border border-slate-200/80"
+          >
+            <h4
+              class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-5"
+            >
+              Workflow Tracking
+            </h4>
+            <div class="space-y-6 relative text-xs">
+              <div
+                class="absolute left-3 top-2 bottom-2 w-0.5 bg-slate-200"
+              ></div>
+
+              <div class="relative pl-8">
+                <div
+                  id="step-icon-1"
+                  class="absolute left-0 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[10px]"
+                >
+                  ✓
+                </div>
+                <p class="font-bold text-slate-800">ⓐ 사용자 상신</p>
+                <p
+                  class="text-slate-400 text-[11px] mt-0.5"
+                  id="detail-timeline-reg"
+                >
+                  상신 완료
+                </p>
+              </div>
+              <div class="relative pl-8">
+                <div
+                  id="step-icon-2"
+                  class="absolute left-0 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]"
+                >
+                  2
+                </div>
+                <p class="font-bold text-slate-800">ⓑ 키맨 / ICT 검토</p>
+                <p class="text-slate-400 text-[11px] mt-0.5">요건 검토</p>
+              </div>
+              <div class="relative pl-8">
+                <div
+                  id="step-icon-3"
+                  class="absolute left-0 w-6 h-6 rounded-full bg-slate-300 text-white flex items-center justify-center font-bold text-[10px]"
+                >
+                  3
+                </div>
+                <p class="font-bold text-slate-700">ⓒ 오토에버 협의</p>
+                <p class="text-slate-400 text-[11px] mt-0.5">
+                  파트너 기술 분석
+                </p>
+              </div>
+              <div class="relative pl-8">
+                <div
+                  id="step-icon-4"
+                  class="absolute left-0 w-6 h-6 rounded-full bg-slate-300 text-white flex items-center justify-center font-bold text-[10px]"
+                >
+                  4
+                </div>
+                <p class="font-bold text-slate-700">ⓓ ITSM 상신</p>
+                <p class="text-slate-400 text-[11px] mt-0.5">변경 티켓 발행</p>
+              </div>
+              <div class="relative pl-8">
+                <div
+                  id="step-icon-5"
+                  class="absolute left-0 w-6 h-6 rounded-full bg-slate-300 text-white flex items-center justify-center font-bold text-[10px]"
+                >
+                  5
+                </div>
+                <p class="font-bold text-slate-700">ⓔ 반영 여부 공유</p>
+                <p class="text-slate-400 text-[11px] mt-0.5">일정 확정</p>
+              </div>
+              <div class="relative pl-8">
+                <div
+                  id="step-icon-6"
+                  class="absolute left-0 w-6 h-6 rounded-full bg-slate-300 text-white flex items-center justify-center font-bold text-[10px]"
+                >
+                  6
+                </div>
+                <p class="font-bold text-slate-700">ⓕ 완료 및 적용</p>
+                <p class="text-slate-400 text-[11px] mt-0.5">최종 운영 반영</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Details and Action Buttons -->
+          <div class="md:col-span-2 space-y-4">
+            <div
+              class="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200"
+            >
+              <div>
+                <span class="text-slate-400">요청자:</span>
+                <span
+                  id="detail-requester"
+                  class="font-semibold text-slate-800"
+                ></span>
+              </div>
+              <div>
+                <span class="text-slate-400">완료요청일:</span>
+                <span
+                  id="detail-target-date"
+                  class="font-semibold text-slate-800"
+                ></span>
+              </div>
+              <div>
+                <span class="text-slate-400">현재상태:</span>
+                <span id="detail-status" class="font-bold text-blue-600"></span>
+              </div>
+              <div>
+                <span class="text-slate-400">등록일시:</span>
+                <span id="detail-regdate" class="text-slate-700"></span>
+              </div>
+            </div>
+
+            <div>
+              <h5
+                class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1"
+              >
+                현상 (As-Is)
+              </h5>
+              <div
+                id="detail-asis"
+                class="p-3.5 bg-red-50/50 border border-red-100 rounded-xl text-xs text-slate-700 leading-relaxed"
+              ></div>
+            </div>
+
+            <div>
+              <h5
+                class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1"
+              >
+                개선 요청 사항 (To-Be)
+              </h5>
+              <div
+                id="detail-tobe"
+                class="p-3.5 bg-blue-50/50 border border-blue-100 rounded-xl text-xs text-slate-700 leading-relaxed"
+              ></div>
+            </div>
+
+            <div>
+              <h5
+                class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1"
+              >
+                비고
+              </h5>
+              <div
+                id="detail-content"
+                class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600"
+              ></div>
+            </div>
+
+            <!-- Workflow Actions -->
+            <div class="pt-4 border-t border-slate-200">
+              <label class="block text-xs font-bold text-slate-700 mb-2"
+                >상태 변경 및 프로세스 단계 이동</label
+              >
+              <div class="flex flex-wrap gap-2">
+                <button
+                  onclick="updateRequestStatus('오토에버 협의')"
+                  class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition"
+                >
+                  ⓒ 오토에버 협의
+                </button>
+                <button
+                  onclick="updateRequestStatus('ITSM 상신')"
+                  class="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-semibold rounded-lg transition"
+                >
+                  ⓓ ITSM 상신
+                </button>
+                <button
+                  onclick="updateRequestStatus('개발/적용중')"
+                  class="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition"
+                >
+                  ⓔ 개발/적용
+                </button>
+                <button
+                  onclick="updateRequestStatus('완료')"
+                  class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-sm"
+                >
+                  ⓕ 최종 완료
+                </button>
+                <button
+                  onclick="updateRequestStatus('반려')"
+                  class="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg transition ml-auto"
+                >
+                  반려
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const API_URL = "http://localhost:3000/api";
+      let currentRequests = [];
+      let selectedRequestId = null;
+
+      // ClickHouse 서버 연결 상태 표시
+      function setConnectionStatus(isConnected, message) {
+        const dot = document.getElementById("connection-status");
+        const text = document.getElementById("connection-text");
+        if (isConnected) {
+          dot.className =
+            "w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200";
+          text.innerText = "ClickHouse 서버 연결됨 (localhost:8123)";
+          text.className = "text-emerald-600 text-xs font-medium";
+        } else {
+          dot.className = "w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse";
+          text.innerText =
+            message || "ClickHouse 서버 연결 끊김 (node server.js 실행 필요)";
+          text.className = "text-red-500 text-xs font-bold";
+        }
+      }
+
+      // 1. 요청 목록 가져오기
+      async function fetchRequests() {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+          const response = await fetch(`${API_URL}/requests`, {
+            method: "GET",
+            headers: { Accept: "application/json" },
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) throw new Error("서버 응답 에러");
+
+          const data = await response.json();
+          currentRequests = Array.isArray(data) ? data : [];
+          setConnectionStatus(true);
+          renderTable(currentRequests);
+          updateStats(currentRequests);
+        } catch (err) {
+          console.warn("ClickHouse API 연결 실패:", err.message);
+          setConnectionStatus(false);
+          document.getElementById("request-list").innerHTML = `
+                    <tr>
+                        <td colspan="7" class="p-12 text-center text-red-500">
+                            <div class="flex flex-col items-center gap-2">
+                                <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                <span class="font-bold">ClickHouse 또는 Node.js API 서버와 통신할 수 없습니다.</span>
+                                <span class="text-xs text-slate-400">VS Code 터미널에서 <b>node server.js</b>가 정상 실행 중인지 확인하세요.</span>
+                            </div>
+                        </td>
+                    </tr>`;
+        }
+      }
+
+      // 2. 테이블 렌더링
+      function renderTable(data) {
+        const tbody = document.getElementById("request-list");
+        if (!data || data.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="7" class="p-12 text-center text-slate-400">등록된 개선 요청이 없습니다.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data
+          .map(
+            (item) => `
+                <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                    <td class="p-4 font-mono text-xs text-slate-500 font-semibold">${item.ReqID}</td>
+                    <td class="p-4">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 text-[10px] font-bold rounded uppercase border ${getSystemBadgeClass(item.SystemType)}">
+                                ${item.SystemType || "Etc"}
+                            </span>
+                            <span class="font-medium text-slate-800 hover:text-blue-600 cursor-pointer" onclick="openDetailModal('${item.ReqID}')">
+                                ${escapeHtml(item.Title)}
+                            </span>
+                        </div>
+                    </td>
+                    <td class="p-4 text-slate-600 text-xs">${escapeHtml(item.Requester || "-")}</td>
+                    <td class="p-4">
+                        <span class="px-2.5 py-1 ${getStatusClass(item.Status)} rounded-full text-xs font-semibold">
+                            ${item.Status || "접수"}
+                        </span>
+                    </td>
+                    <td class="p-4 text-xs text-slate-500">${item.TargetDate ? item.TargetDate : "-"}</td>
+                    <td class="p-4 text-xs text-slate-400">${item.RegDate ? formatDate(item.RegDate) : "-"}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="openDetailModal('${item.ReqID}')" class="px-3 py-1 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 rounded-lg text-xs font-medium transition">
+                            상세보기
+                        </button>
+                    </td>
+                </tr>
+            `,
+          )
+          .join("");
+      }
+
+      // 3. 신규 요청 상신 (ClickHouse INSERT)
+      async function submitRequest(e) {
+        e.preventDefault();
+        const payload = {
+          systemType: document.getElementById("systemType").value,
+          targetDate: document.getElementById("targetDate").value,
+          title: document.getElementById("title").value,
+          currentStatus: document.getElementById("currentStatus").value,
+          improvementRequest:
+            document.getElementById("improvementRequest").value,
+          content: document.getElementById("content").value,
+          requester: document.getElementById("requester").value,
+        };
+
+        try {
+          const response = await fetch(`${API_URL}/requests`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            closeModal("requestModal");
+            document.getElementById("submitForm").reset();
+            await fetchRequests();
+          } else {
+            const errorMsg = await response.text();
+            console.error("ClickHouse 상신 오류:", errorMsg);
+          }
+        } catch (err) {
+          console.error("서버 연결 실패:", err);
+        }
+      }
+
+      // 4. 상태 변경 (ClickHouse ALTER UPDATE)
+      async function updateRequestStatus(newStatus) {
+        if (!selectedRequestId) return;
+        try {
+          const response = await fetch(
+            `${API_URL}/requests/${selectedRequestId}/status`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: newStatus }),
+            },
+          );
+
+          if (response.ok) {
+            closeModal("detailModal");
+            await fetchRequests();
+          } else {
+            console.error("상태 변경 실패");
+          }
+        } catch (err) {
+          console.error("상태 변경 오류:", err);
+        }
+      }
+
+      // 5. 상세 보기 모달 열기
+      function openDetailModal(reqId) {
+        const item = currentRequests.find((r) => r.ReqID === reqId);
+        if (!item) return;
+
+        selectedRequestId = reqId;
+        document.getElementById("detail-reqid").innerText = item.ReqID;
+        document.getElementById("detail-system-badge").innerText =
+          item.SystemType || "Etc";
+        document.getElementById("detail-title").innerText = item.Title;
+        document.getElementById("detail-requester").innerText =
+          item.Requester || "-";
+        document.getElementById("detail-target-date").innerText =
+          item.TargetDate || "미지정";
+        document.getElementById("detail-status").innerText =
+          item.Status || "접수";
+        document.getElementById("detail-regdate").innerText = item.RegDate
+          ? formatDate(item.RegDate)
+          : "-";
+        document.getElementById("detail-asis").innerText =
+          item.CurrentStatus || "(내용 없음)";
+        document.getElementById("detail-tobe").innerText =
+          item.ImprovementRequest || "(내용 없음)";
+        document.getElementById("detail-content").innerText =
+          item.Content || "특이사항 없음";
+        document.getElementById("detail-timeline-reg").innerText = item.RegDate
+          ? formatDate(item.RegDate)
+          : "상신 완료";
+
+        highlightTimeline(item.Status);
+        openModal("detailModal");
+      }
+
+      function highlightTimeline(status) {
+        const steps = [
+          {
+            id: "step-icon-1",
+            activeOn: [
+              "접수",
+              "오토에버 협의",
+              "ITSM 상신",
+              "개발/적용중",
+              "완료",
+            ],
+          },
+          {
+            id: "step-icon-2",
+            activeOn: ["오토에버 협의", "ITSM 상신", "개발/적용중", "완료"],
+          },
+          {
+            id: "step-icon-3",
+            activeOn: ["오토에버 협의", "ITSM 상신", "개발/적용중", "완료"],
+          },
+          { id: "step-icon-4", activeOn: ["ITSM 상신", "개발/적용중", "완료"] },
+          { id: "step-icon-5", activeOn: ["개발/적용중", "완료"] },
+          { id: "step-icon-6", activeOn: ["완료"] },
+        ];
+
+        steps.forEach((step, idx) => {
+          const el = document.getElementById(step.id);
+          if (!el) return;
+          if (step.activeOn.includes(status)) {
+            el.className =
+              "absolute left-0 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] shadow-sm";
+          } else {
+            el.className =
+              "absolute left-0 w-6 h-6 rounded-full bg-slate-300 text-white flex items-center justify-center font-bold text-[10px]";
+          }
+        });
+      }
+
+      // 스타일 헬퍼
+      function getStatusClass(status) {
+        switch (status) {
+          case "완료":
+            return "bg-emerald-100 text-emerald-800";
+          case "반려":
+            return "bg-rose-100 text-rose-800";
+          case "접수":
+            return "bg-amber-100 text-amber-800";
+          case "오토에버 협의":
+            return "bg-indigo-100 text-indigo-800";
+          case "ITSM 상신":
+            return "bg-purple-100 text-purple-800";
+          default:
+            return "bg-blue-100 text-blue-800";
+        }
+      }
+
+      function getSystemBadgeClass(sys) {
+        switch (sys) {
+          case "Client":
+            return "bg-sky-50 text-sky-700 border-sky-200";
+          case "Web":
+            return "bg-emerald-50 text-emerald-700 border-emerald-200";
+          case "WCT":
+            return "bg-purple-50 text-purple-700 border-purple-200";
+          case "Loader":
+            return "bg-amber-50 text-amber-700 border-amber-200";
+          default:
+            return "bg-slate-100 text-slate-600 border-slate-200";
+        }
+      }
+
+      function updateStats(data) {
+        if (!data) return;
+        document.getElementById("stat-total").innerText = `${data.length}건`;
+        document.getElementById("stat-done").innerText =
+          `${data.filter((i) => i.Status === "완료").length}건`;
+        document.getElementById("stat-review").innerText =
+          `${data.filter((i) => i.Status === "접수").length}건`;
+        document.getElementById("stat-progress").innerText =
+          `${data.filter((i) => i.Status !== "완료" && i.Status !== "접수" && i.Status !== "반려").length}건`;
+      }
+
+      function formatDate(dateStr) {
+        try {
+          const d = new Date(dateStr);
+          return isNaN(d.getTime())
+            ? dateStr
+            : d.toLocaleDateString() +
+                " " +
+                d.toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                });
+        } catch {
+          return dateStr;
+        }
+      }
+
+      function escapeHtml(text) {
+        if (!text) return "";
+        const map = {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#039;",
+        };
+        return String(text).replace(/[&<>"']/g, (m) => map[m]);
+      }
+
+      function openModal(id) {
+        document.getElementById(id).style.display = "flex";
+      }
+      function closeModal(id) {
+        document.getElementById(id).style.display = "none";
+      }
+
+      // 모달 외부 클릭 시 닫기
+      window.onclick = function (event) {
+        if (event.target.classList.contains("modal")) {
+          event.target.style.display = "none";
+        }
+      };
+
+      // 초기 로딩 및 주기적 갱신
+      setInterval(fetchRequests, 10000);
+      window.onload = fetchRequests;
+    </script>
+  </body>
+</html>
